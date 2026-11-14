@@ -92,6 +92,11 @@ jobs:
             exit 1
           fi
 
+      - name: Disable unconfigured Durable Objects and Cron for safe deployment
+        run: |
+          # 保留现有 D1 与 [vars]，本次不注册新 DO，也不启用 Cron。
+          sed -i '/^# 观影室的 Durable Object。/,/^# 注意：\[vars\] 必须留在文件最后。/d' wrangler.toml
+
       - name: Update wrangler.toml with environment variables
         env:
           # VARS 支持多行 KEY=VALUE；用 env 传递，避免多行写入 $GITHUB_ENV 时报错。
@@ -187,7 +192,8 @@ jobs:
       - name: Install Wrangler
         run: pnpm add -g wrangler@4.60.0
 
-      - name: Run D1 Database Migrations
+      - name: Run D1 Database Migrations (disabled for safe code-only deployment)
+        if: false
         run: |
           STORAGE_TYPE="${{ secrets.NEXT_PUBLIC_STORAGE_TYPE }}"
 
