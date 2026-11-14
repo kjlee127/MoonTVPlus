@@ -33,6 +33,10 @@ export default {
     // 客户端在 internal 模式下连同源 /socket.io（server-config 默认就是 internal），
     // 所以这里在进 Next 之前拦下来。
     if (url.pathname === '/socket.io' || url.pathname.startsWith('/socket.io/')) {
+      // Safe deployments may intentionally omit the WATCH_ROOM binding.
+      if (!env.WATCH_ROOM) {
+        return new Response('观影室功能暂未启用', { status: 503 });
+      }
       const id = env.WATCH_ROOM.idFromName('hub');
       return env.WATCH_ROOM.get(id).fetch(request);
     }
