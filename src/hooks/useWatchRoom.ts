@@ -620,6 +620,19 @@ export function getStoredRoomInfo(): StoredRoomInfo | null {
 
   try {
     const info: StoredRoomInfo = JSON.parse(stored);
+    // 验证必要字段，避免损坏或不完整的缓存被视为有效房间会话。
+    if (
+      !info ||
+      typeof info.roomId !== 'string' ||
+      !info.roomId ||
+      typeof info.userName !== 'string' ||
+      !info.userName ||
+      !Number.isFinite(info.timestamp)
+    ) {
+      clearStoredRoomInfo();
+      return null;
+    }
+
     // 检查是否过期（24小时）
     if (Date.now() - info.timestamp > 24 * 60 * 60 * 1000) {
       clearStoredRoomInfo();
