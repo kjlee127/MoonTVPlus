@@ -4,9 +4,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 
-import { getStoredRoomInfo, useWatchRoom } from '@/hooks/useWatchRoom';
-
 import Toast, { ToastProps } from '@/components/Toast';
+
+import { getStoredRoomInfo, useWatchRoom } from '@/hooks/useWatchRoom';
 
 import { getAuthInfoFromBrowserCookie } from '@/lib/auth';
 
