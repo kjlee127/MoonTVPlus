@@ -41,6 +41,8 @@ jobs:
             -e 's/database_name = "moontvplus"/database_name = "moontvplus-test"/' \
             -e 's/REPLACE_WITH_YOUR_D1_DATABASE_ID/0e2e0912-8bbd-41ab-a89d-ac93fd2683ff/' \
             wrangler.toml > wrangler-test.toml
+          # OpenNext emits .open-next (lowercase), while the checked-in config uses .openNext.
+          sed -i 's|.openNext/assets|.open-next/assets|' wrangler-test.toml
           cat >> wrangler-test.toml <<'EOF'
 
           [[routes]]
