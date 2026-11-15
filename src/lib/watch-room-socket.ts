@@ -37,17 +37,21 @@ class WatchRoomSocketManager {
           reject(new Error('Socket connection timeout'));
         }, 10000);
 
-        this.socket!.once('connect', () => {
+        const handleConnect = () => {
           clearTimeout(timeout);
+          this.socket!.off('connect_error', handleConnectError);
           this.connectionPromise = null;
           resolve(this.socket!);
-        });
-
-        this.socket!.once('connect_error', (error) => {
+        };
+        const handleConnectError = (error: Error) => {
           clearTimeout(timeout);
+          this.socket!.off('connect', handleConnect);
           this.connectionPromise = null;
           reject(error);
-        });
+        };
+
+        this.socket!.once('connect', handleConnect);
+        this.socket!.once('connect_error', handleConnectError);
 
         if (!this.socket!.connected) {
           this.socket!.connect();
@@ -60,11 +64,14 @@ class WatchRoomSocketManager {
     this.config = config;
 
     const socketOptions = {
-      transports: ['websocket', 'polling'] as ('websocket' | 'polling')[],
+      // WatchRoomHub currently implements Engine.IO WebSocket only. Do not advertise
+      // polling as a fallback until the server implements the complete polling transport.
+      transports: ['websocket'] as ('websocket')[],
       reconnection: true,
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5,
+      reconnectionDelayMax: 10000,
+      reconnectionAttempts: Infinity,
+      timeout: 20000,
     };
 
     if (config.serverType === 'internal') {
@@ -114,21 +121,25 @@ class WatchRoomSocketManager {
       }
 
       // 使用 once 而不是 on，避免重复注册
-      this.socket.once('connect', () => {
+      const handleConnect = () => {
         // eslint-disable-next-line no-console
         console.log('[WatchRoom] Connected to server');
+        this.socket?.off('connect_error', handleConnectError);
         this.connectionPromise = null;
         if (this.socket) {
           resolve(this.socket);
         }
-      });
-
-      this.socket.once('connect_error', (error) => {
+      };
+      const handleConnectError = (error: Error) => {
         // eslint-disable-next-line no-console
-        console.error('[WatchRoom] Connection error:', error);
+        console.error('[WatchRoom] Connection error:', { message: error.message });
+        this.socket?.off('connect', handleConnect);
         this.connectionPromise = null;
         reject(error);
-      });
+      };
+
+      this.socket.once('connect', handleConnect);
+      this.socket.once('connect_error', handleConnectError);
     });
 
     return this.connectionPromise;
