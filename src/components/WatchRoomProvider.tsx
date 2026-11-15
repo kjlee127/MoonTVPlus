@@ -228,14 +228,10 @@ export function WatchRoomProvider({ children }: WatchRoomProviderProps) {
       return;
     }
 
+    // 功能开关与连接状态必须分离：
+    // 首页不建立 WebSocket，但仍需读取配置以显示观影室导航入口。
     if (shouldDisableWatchRoomConnection) {
       watchRoom.disconnect();
-      setConfig({
-        enabled: false,
-        serverType: 'internal',
-      });
-      setIsEnabled(false);
-      return;
     }
 
     let cancelled = false;
@@ -289,8 +285,9 @@ export function WatchRoomProvider({ children }: WatchRoomProviderProps) {
 
           if (cancelled) return;
 
-          // 只在启用了观影室且当前页面/会话需要时才连接
-          if (watchRoomConfig.enabled) {
+          // 只在功能已启用且当前页面/会话需要时才连接。
+          // isEnabled 只表示功能开关，不代表此刻应建立 WebSocket。
+          if (watchRoomConfig.enabled && !shouldDisableWatchRoomConnection) {
             console.log('[WatchRoom] Connecting with config:', watchRoomConfig);
 
             // 设置重连回调
