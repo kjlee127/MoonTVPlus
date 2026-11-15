@@ -4,7 +4,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 
-import { useWatchRoom } from '@/hooks/useWatchRoom';
+import { getStoredRoomInfo, useWatchRoom } from '@/hooks/useWatchRoom';
 
 import Toast, { ToastProps } from '@/components/Toast';
 
@@ -152,7 +152,7 @@ export function WatchRoomProvider({ children }: WatchRoomProviderProps) {
       const lastActiveAt = Number(window.localStorage.getItem(WATCH_ROOM_NO_CONNECT_TIMESTAMP_KEY) || 0);
       const isScreenPage = pathname === WATCH_ROOM_SCREEN_PATH;
       const isWatchRoomPage = isWatchRoomPagePath(pathname);
-      const hasStoredRoom = Boolean(window.localStorage.getItem('watch_room_info'));
+      const hasStoredRoom = Boolean(getStoredRoomInfo());
       const isTVPage = isTVPagePath(pathname);
       const isExpired = !lastActiveAt || Date.now() - lastActiveAt > WATCH_ROOM_NO_CONNECT_TTL_MS;
 
