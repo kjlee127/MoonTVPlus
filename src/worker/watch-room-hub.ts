@@ -35,7 +35,7 @@ const PING_TIMEOUT_MS = 20_000;
 const TICK_MS = 10_000; // 定时器节拍，替代原 setInterval(…, 10000)
 const STATE_CLEAR_MS = 30_000; // 房主静默多久清空播放状态
 const ROOM_DELETE_MS = 5 * 60_000; // 房主静默多久删房间
-const EMPTY_ROOM_GRACE_MS = 30_000; // 空房间保留多久
+const EMPTY_ROOM_GRACE_MS = 30 * 60_000; // 空房间保留 30 分钟
 
 interface SocketMeta {
   ws: CfWebSocket;
