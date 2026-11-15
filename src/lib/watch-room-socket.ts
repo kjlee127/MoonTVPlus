@@ -60,11 +60,14 @@ class WatchRoomSocketManager {
     this.config = config;
 
     const socketOptions = {
-      transports: ['websocket', 'polling'] as ('websocket' | 'polling')[],
+      // WatchRoomHub currently implements Engine.IO WebSocket only. Do not advertise
+      // polling as a fallback until the server implements the complete polling transport.
+      transports: ['websocket'] as ('websocket')[],
       reconnection: true,
       reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5,
+      reconnectionDelayMax: 10000,
+      reconnectionAttempts: Infinity,
+      timeout: 20000,
     };
 
     if (config.serverType === 'internal') {
@@ -123,9 +126,13 @@ class WatchRoomSocketManager {
         }
       });
 
-      this.socket.once('connect_error', (error) => {
+      this.socket.on('connect_error', (error) => {
         // eslint-disable-next-line no-console
-        console.error('[WatchRoom] Connection error:', error);
+        console.error('[WatchRoom] Connection error:', {
+          message: error.message,
+          description: error.description,
+          context: error.context,
+        });
         this.connectionPromise = null;
         reject(error);
       });
