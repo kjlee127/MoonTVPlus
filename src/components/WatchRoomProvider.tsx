@@ -23,6 +23,10 @@ function isTVPagePath(pathname: string | null) {
   return pathname === '/tv' || Boolean(pathname?.startsWith('/tv/'));
 }
 
+function isWatchRoomPagePath(pathname: string | null) {
+  return pathname === '/watch-room' || Boolean(pathname?.startsWith('/watch-room/'));
+}
+
 interface WatchRoomContextType {
   socket: WatchRoomSocket | null;
   isConnected: boolean;
@@ -147,6 +151,8 @@ export function WatchRoomProvider({ children }: WatchRoomProviderProps) {
       const noConnect = window.localStorage.getItem(WATCH_ROOM_NO_CONNECT_KEY) === '1';
       const lastActiveAt = Number(window.localStorage.getItem(WATCH_ROOM_NO_CONNECT_TIMESTAMP_KEY) || 0);
       const isScreenPage = pathname === WATCH_ROOM_SCREEN_PATH;
+      const isWatchRoomPage = isWatchRoomPagePath(pathname);
+      const hasStoredRoom = Boolean(window.localStorage.getItem('watch_room_info'));
       const isTVPage = isTVPagePath(pathname);
       const isExpired = !lastActiveAt || Date.now() - lastActiveAt > WATCH_ROOM_NO_CONNECT_TTL_MS;
 
@@ -155,7 +161,10 @@ export function WatchRoomProvider({ children }: WatchRoomProviderProps) {
         window.localStorage.removeItem(WATCH_ROOM_NO_CONNECT_TIMESTAMP_KEY);
       }
 
-      setShouldDisableWatchRoomConnection(isTVPage || (!isScreenPage && noConnect && !isExpired));
+      // 空闲浏览时不建立 WebSocket；观影室页面或已有房间会话时保持连接。
+      // 已加入房间后切换到首页/播放页，不因路由变化而中断同步。
+      const shouldRespectNoConnect = noConnect && !isScreenPage && !isExpired && !hasStoredRoom;
+      setShouldDisableWatchRoomConnection(shouldRespectNoConnect || (isTVPage && !hasStoredRoom) || (!isWatchRoomPage && !hasStoredRoom));
     };
 
     refreshWatchRoomConnectionState();
@@ -229,12 +238,16 @@ export function WatchRoomProvider({ children }: WatchRoomProviderProps) {
       return;
     }
 
+    let cancelled = false;
+
     const loadConfig = async () => {
       try {
         // 使用公共 API 获取观影室配置（不需要管理员权限）
         const response = await fetch('/api/server-config');
+        if (cancelled) return;
         if (response.ok) {
           const data = await response.json();
+          if (cancelled) return;
           // API 返回格式: { SiteName, StorageType, Version, WatchRoom }
           const watchRoomConfig: WatchRoomConfig = {
             enabled: data.WatchRoom?.enabled ?? false, // 默认不启用
@@ -251,8 +264,10 @@ export function WatchRoomProvider({ children }: WatchRoomProviderProps) {
             } else {
               try {
                 const authResponse = await fetch('/api/watch-room-auth');
+                if (cancelled) return;
                 if (authResponse.ok) {
                   const authData = await authResponse.json();
+                  if (cancelled) return;
                   watchRoomConfig.externalServerAuth = authData.externalServerAuth;
                   // 多应用隔离 ID（未配置时不携带，兼容旧版外部服务器）
                   watchRoomConfig.externalAppId = authData.externalAppId || undefined;
@@ -272,7 +287,9 @@ export function WatchRoomProvider({ children }: WatchRoomProviderProps) {
           setConfig(watchRoomConfig);
           setIsEnabled(watchRoomConfig.enabled);
 
-          // 只在启用了观影室时才连接
+          if (cancelled) return;
+
+          // 只在启用了观影室且当前页面/会话需要时才连接
           if (watchRoomConfig.enabled) {
             console.log('[WatchRoom] Connecting with config:', watchRoomConfig);
 
@@ -288,6 +305,7 @@ export function WatchRoomProvider({ children }: WatchRoomProviderProps) {
               setReconnectFailed(false);
             });
 
+            if (cancelled) return;
             await watchRoom.connect(watchRoomConfig);
           } else {
             console.log('[WatchRoom] Watch room is disabled, skipping connection');
@@ -315,7 +333,11 @@ export function WatchRoomProvider({ children }: WatchRoomProviderProps) {
     };
 
     loadConfig();
-  }, [isLoggedIn, shouldDisableWatchRoomConnection]); // 添加 isLoggedIn 作为依赖
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn, shouldDisableWatchRoomConnection, pathname]); // 路由变化时取消过期的异步连接任务
 
   // 仅在 Provider 卸载时断开，避免路由切换时误断开房间连接
   useEffect(() => {
