@@ -600,7 +600,8 @@ export class WatchRoomHub {
         room.currentState = null;
         this.toRoom(roomId, 'state:cleared', []);
       }
-      if (idle > ROOM_DELETE_MS) {
+      // 空房间有独立的 30 分钟宽限期，不能被房主静默删除计时提前清理。
+      if (idle > ROOM_DELETE_MS && !this.emptyRoomDeleteAt.has(roomId)) {
         this.deleteRoom(roomId);
       }
     }
