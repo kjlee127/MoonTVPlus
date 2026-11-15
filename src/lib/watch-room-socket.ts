@@ -126,12 +126,10 @@ class WatchRoomSocketManager {
         }
       });
 
-      this.socket.on('connect_error', (error) => {
+      this.socket.once('connect_error', (error) => {
         // eslint-disable-next-line no-console
         console.error('[WatchRoom] Connection error:', {
           message: error.message,
-          description: error.description,
-          context: error.context,
         });
         this.connectionPromise = null;
         reject(error);
