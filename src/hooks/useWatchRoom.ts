@@ -101,7 +101,17 @@ export function useWatchRoom(
       }
     } catch (error) {
       console.error('[WatchRoom] Failed to connect:', error);
-      setIsConnected(false);
+
+      // Keep the Socket.IO instance in React even when its first handshake fails.
+      // Socket.IO may still reconnect in the background; without this reference the
+      // hook never subscribes to its later "connect" event and remains falsely offline.
+      const pendingSocket = watchRoomSocketManager.getSocket();
+      if (pendingSocket) {
+        setSocket(pendingSocket);
+        setIsConnected(pendingSocket.connected);
+      } else {
+        setIsConnected(false);
+      }
     }
   }, [scheduleRejoin]);
 
@@ -543,6 +553,16 @@ export function useWatchRoom(
     socket.on('disconnect', () => {
       setIsConnected(false);
     });
+
+    // Cover the narrow race where automatic reconnection succeeds between the
+    // failed connect() promise and this effect subscribing to the socket.
+    if (socket.connected) {
+      setIsConnected(true);
+      const storedInfo = getStoredRoomInfo();
+      if (storedInfo) {
+        scheduleRejoin(storedInfo);
+      }
+    }
 
     return () => {
       socket.off('room:joined');
