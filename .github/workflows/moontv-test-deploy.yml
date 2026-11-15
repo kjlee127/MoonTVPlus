@@ -1,0 +1,77 @@
+name: Deploy isolated MoonTV test Worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/moontv-test-deploy.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: moontv-plus-test-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout fix branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/watch-room-lazy-connection
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Create isolated Wrangler config
+        run: |
+          sed \
+            -e 's/name = "moontv-plus"/name = "moontv-plus-test"/' \
+            -e 's/database_name = "moontvplus"/database_name = "moontvplus-test"/' \
+            -e 's/REPLACE_WITH_YOUR_D1_DATABASE_ID/0e2e0912-8bbd-41ab-a89d-ac93fd2683ff/' \
+            wrangler.toml > wrangler-test.toml
+          cat >> wrangler-test.toml <<'EOF'
+
+          [[routes]]
+          pattern = "moontv-test.kjlee.cc.cd"
+          custom_domain = true
+          EOF
+
+      - name: Build Cloudflare Worker
+        env:
+          BUILD_TARGET: cloudflare
+          NODE_ENV: production
+          NEXT_PUBLIC_STORAGE_TYPE: d1
+          NEXT_PUBLIC_SITE_NAME: MoonTV Plus Test
+          WATCH_ROOM_ENABLED: "true"
+          WATCH_ROOM_SERVER_TYPE: internal
+        run: pnpm build:cloudflare
+
+      - name: Install Wrangler
+        run: pnpm add -g wrangler@4.60.0
+
+      - name: Apply isolated D1 migrations
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: wrangler d1 migrations apply moontvplus-test --remote --config wrangler-test.toml
+
+      - name: Deploy isolated test Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --config wrangler-test.toml --keep-vars
+          packageManager: pnpm
+          wranglerVersion: "4.60.0"
