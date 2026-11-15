@@ -554,6 +554,16 @@ export function useWatchRoom(
       setIsConnected(false);
     });
 
+    // Cover the narrow race where automatic reconnection succeeds between the
+    // failed connect() promise and this effect subscribing to the socket.
+    if (socket.connected) {
+      setIsConnected(true);
+      const storedInfo = getStoredRoomInfo();
+      if (storedInfo) {
+        scheduleRejoin(storedInfo);
+      }
+    }
+
     return () => {
       socket.off('room:joined');
       socket.off('room:member-joined');
